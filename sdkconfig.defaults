@@ -1,0 +1,63 @@
+#
+# 机器蜘蛛默认配置（仅列需要偏离 ESP-IDF 默认值的项）
+# 生成者：M0 骨架
+# 硬件依据：docs/hardware.md
+#
+
+# --- 目标芯片 ---
+CONFIG_IDF_TARGET="esp32"
+
+# --- Flash 与分区 ---
+# 4MB flash，单一 1.2MB app 分区；Web 控制页 gzip 后内嵌，留足余量
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# --- CPU 与 FreeRTOS ---
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+# motion 任务 2ms tick 需要 1kHz 系统 tick
+CONFIG_FREERTOS_HZ=1000
+# 步态引擎用 tickless 会引入抖动，关闭
+CONFIG_FREERTOS_USE_TICKLESS_IDLE=n
+
+# --- 日志 ---
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_MAXIMUM_LEVEL_DEBUG=y
+
+# --- 看门狗 ---
+CONFIG_ESP_TASK_WDT_TIMEOUT_S=10
+# motion 任务周期短，禁止其加入 WDT 订阅
+CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_CPU0=n
+
+# --- NVS ---
+CONFIG_PARTITION_TABLE_FILENAME="partitions.csv"
+
+# --- WiFi / Web（M3 启用）---
+CONFIG_ESP_WIFI_ENABLED=y
+# AP 模式：软 AP + httpd + WebSocket 控制通道
+CONFIG_ESP_WIFI_SOFTAP_SUPPORT=y
+CONFIG_LWIP_LOCAL_HOSTNAME="spider"
+
+# --- HTTP Server / WebSocket ---
+CONFIG_HTTPD_WS_SUPPORT=y
+
+# --- lwIP 收缩（AP + 单页控制，无需大窗口/大缓冲）---
+# Flash 已用 82%，这里主要回收 DRAM/IRAM
+CONFIG_LWIP_TCP_SND_BUF_DEFAULT=11680
+CONFIG_LWIP_TCP_WND_DEFAULT=11680
+CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=32
+CONFIG_LWIP_UDP_RECVMBOX_SIZE=8
+CONFIG_LWIP_TCPIP_TASK_STACK_SIZE=3072
+
+# --- mbedTLS 收缩（我们只做明文 AP，不需要大握手缓冲与证书）---
+CONFIG_MBEDTLS_SSL_IN_CONTENT_LEN=4096
+CONFIG_MBEDTLS_SSL_OUT_CONTENT_LEN=4096
+CONFIG_MBEDTLS_DYNAMIC_BUFFER=y
+
+# --- 编译优化 ---
+CONFIG_COMPILER_OPTIMIZATION_SIZE=y
+
+# --- 栈检查 ---
+# 运动任务栈 4096B，Web 任务栈 8192B，栈溢出对双足/四足是灾难性故障
+CONFIG_COMPILER_STACK_CHECK=y
+CONFIG_COMPILER_STACK_CHECK_MODE_STRONG=y

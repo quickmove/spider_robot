@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#12161c">
+<title>机器蜘蛛 · 控制台</title>
+<style>
+  :root{
+    --bg:#12161c; --card:#1b212a; --line:#2a323d; --fg:#e6edf3; --dim:#8b98a5;
+    --ok:#3fb950; --warn:#d29922; --bad:#f85149; --accent:#58a6ff;
+    --r:14px; --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--fg);
+    font:15px/1.45 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+    overscroll-behavior:none}
+  body{padding-bottom:var(--safe-b)}
+
+  header{position:sticky;top:0;z-index:20;background:rgba(18,22,28,.94);
+    backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+    padding:10px 14px;display:flex;align-items:center;gap:10px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--bad);flex:0 0 auto}
+  .dot.on{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  h1{font-size:15px;margin:0;font-weight:600;flex:1}
+  .tag{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+
+  main{padding:12px 14px 28px;max-width:760px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:12px;margin-bottom:12px}
+  .card h2{font-size:12px;color:var(--dim);margin:0 0 10px;font-weight:600;
+    letter-spacing:.06em;text-transform:uppercase}
+
+  /* 急停：常驻顶部，红底大字 */
+  #estop{width:100%;padding:18px;font-size:22px;font-weight:700;letter-spacing:.3em;
+    background:var(--bad);color:#fff;border:0;border-radius:var(--r);
+    font-family:inherit;margin-bottom:12px;box-shadow:0 4px 18px rgba(248,81,73,.28)}
+  #estop:active{transform:scale(.98)}
+  #estop.latched{animation:blink 1s infinite}
+  @keyframes blink{50%{opacity:.45}}
+
+  /* 摇杆 */
+  .stick-wrap{display:flex;gap:14px;align-items:center}
+  #stick{position:relative;width:172px;height:172px;border-radius:50%;flex:0 0 auto;
+    background:radial-gradient(circle at 50% 45%,#232b36,#171d25);
+    border:1px solid var(--line);touch-action:none;user-select:none}
+  #stick::before,#stick::after{content:"";position:absolute;background:var(--line);opacity:.5}
+  #stick::before{left:14%;right:14%;top:50%;height:1px}
+  #stick::after{top:14%;bottom:14%;left:50%;width:1px}
+  #knob{position:absolute;left:50%;top:50%;width:62px;height:62px;margin:-31px 0 0 -31px;
+    border-radius:50%;background:linear-gradient(#3d4855,#2a323d);border:1px solid #46525f;
+    box-shadow:0 3px 10px rgba(0,0,0,.45);pointer-events:none}
+  .readout{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+  .kv{background:#151a21;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+  .kv b{display:block;font-size:10px;color:var(--dim);font-weight:500;letter-spacing:.05em}
+  .kv span{font-size:17px;font-variant-numeric:tabular-nums}
+
+  button.btn{background:#242c36;color:var(--fg);border:1px solid var(--line);
+    border-radius:10px;padding:11px 8px;font:inherit;font-size:14px;cursor:pointer}
+  button.btn:active{background:#2f3945}
+  button.btn.on{background:var(--accent);border-color:var(--accent);color:#04121f;font-weight:600}
+  button.btn:disabled{opacity:.4}
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .grid.g3{grid-template-columns:repeat(3,1fr)}
+
+  /* 状态徽标 */
+  .badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+  .badge{font-size:11px;padding:3px 8px;border-radius:999px;border:1px solid var(--line);
+    color:var(--dim);background:#151a21}
+  .badge.ok{color:var(--ok);border-color:#1d4429;background:#12261a}
+  .badge.warn{color:var(--warn);border-color:#4a3a12;background:#241d10}
+  .badge.bad{color:var(--bad);border-color:#5c2222;background:#2a1414}
+
+  /* 腿视图 */
+  #legs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .leg{background:#151a21;border:1px solid var(--line);border-radius:10px;
+    padding:8px;text-align:center}
+  .leg b{display:block;font-size:11px;color:var(--dim);font-weight:600}
+  .leg svg{display:block;margin:2px auto 4px}
+  .leg i{font-style:normal;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .leg.swing{border-color:var(--accent)}
+
+  table.kv{width:100%;border-collapse:collapse;font-size:13px}
+  table.kv td{padding:4px 0;font-variant-numeric:tabular-nums}
+  table.kv td:last-child{text-align:right;color:var(--dim)}
+
+  /* 标定 */
+  details>summary{cursor:pointer;font-size:13px;color:var(--accent);padding:6px 0;
+    list-style:none;user-select:none}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+  details[open]>summary::before{content:"▾ "}
+  .calrow{display:grid;grid-template-columns:44px 1fr;gap:8px;align-items:center;
+    padding:7px 0;border-bottom:1px solid #1f262f}
+  .calrow:last-child{border-bottom:0}
+  .calrow .name{font-size:12px;color:var(--dim)}
+  .sliders{display:grid;grid-template-columns:1fr;gap:3px}
+  .sline{display:grid;grid-template-columns:38px 1fr 44px;gap:6px;align-items:center}
+  .sline label{font-size:10px;color:var(--dim)}
+  .sline output{font-size:10px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
+  input[type=range]{width:100%;accent-color:var(--accent);height:16px}
+  input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px}
+  .note{font-size:11px;color:var(--dim);line-height:1.5;margin:8px 0 0}
+  .warnbox{border:1px solid #5c2222;background:#2a1414;color:#ffb3ae;border-radius:10px;
+    padding:9px 11px;font-size:12px;margin-bottom:12px}
+  .warnbox b{color:#ff8b84}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1}
+  #toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);
+    background:#2f3945;border:1px solid var(--line);border-radius:10px;padding:10px 16px;
+    font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:88vw}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot" id="dot"></div>
+  <h1>机器蜘蛛</h1>
+  <span class="tag" id="conn">连接中…</span>
+</header>
+
+<main>
+
+  <div class="warnbox" id="calwarn" style="display:none">
+    <b>尚未标定。</b>舵机脉宽范围因批次而异，未标定直接行走可能顶死舵机。
+    请架空机器人，用串口执行 <code>cal enter</code> → <code>cal scan</code> → <code>cal save</code>，
+    或在下方「标定」中逐路设置。
+  </div>
+
+  <button id="estop">急 停</button>
+
+  <div class="card">
+    <h2>行走</h2>
+    <div class="stick-wrap">
+      <div id="stick"><div id="knob"></div></div>
+      <div class="readout">
+        <div class="kv"><b>模式</b><span id="rMode">—</span></div>
+        <div class="kv"><b>步态</b><span id="rGait">—</span></div>
+        <div class="kv"><b>速度</b><span id="rSpeed">—</span></div>
+        <div class="kv"><b>高度</b><span id="rHeight">—</span></div>
+        <div class="kv"><b>航向</b><span id="rYaw">—</span></div>
+        <div class="kv"><b>支撑裕度</b><span id="rMargin">—</span></div>
+      </div>
+    </div>
+    <div class="grid g3" style="margin-top:12px">
+      <button class="btn" id="bCrawl">爬行</button>
+      <button class="btn" id="bTrot">小跑</button>
+      <button class="btn" id="bStop">停止</button>
+    </div>
+    <div style="margin-top:10px">
+      <div class="sline" style="grid-template-columns:52px 1fr 44px">
+        <label>速度</label>
+        <input type="range" id="speed" min="0" max="100" value="40">
+        <output id="speedOut">40%</output>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>姿态与动作</h2>
+    <div class="grid">
+      <button class="btn" data-pose="stand">站立</button>
+      <button class="btn" data-pose="sit">蹲坐</button>
+      <button class="btn" data-pose="rest">休息</button>
+      <button class="btn" data-pose="spawn">翻车</button>
+    </div>
+    <div class="grid g3" style="margin-top:8px">
+      <button class="btn" id="bStand">回站立</button>
+      <button class="btn" id="bClearEstop">解除急停</button>
+      <button class="btn" id="bRefresh">刷新状态</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="tag" style="font-size:11px;color:var(--dim)">变高</label>
+      <input type="range" id="height" class="grow" min="90" max="150" value="120">
+      <output id="heightOut" class="tag">120mm</output>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>腿位</h2>
+    <div id="legs"></div>
+    <table class="kv" style="margin-top:10px">
+      <tr><td>巡航高度 / 耦合比</td><td id="tGeom">—</td></tr>
+      <tr><td>巡航速度（爬行/小跑）</td><td id="tSpeed">—</td></tr>
+      <tr><td>堆剩余 / 芯片温度</td><td id="tMem">—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>微调与姿态偏移</h2>
+    <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+      <button class="btn" data-nudge="-1,0">后退 3cm</button>
+      <button class="btn" data-nudge="0,0">原地复位</button>
+      <button class="btn" data-nudge="1,0">前进 3cm</button>
+      <button class="btn" data-strafe="-100">左移 10cm</button>
+      <button class="btn" data-strafe="0">—</button>
+      <button class="btn" data-strafe="100">右移 10cm</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <label class="tag" style="font-size:11px;color:var(--dim);width:56px">横滚</label>
+      <input type="range" id="roll" class="grow" min="-10" max="10" value="0">
+      <output id="rollOut" class="tag">0°</output>
+    </div>
+    <div class="row" style="margin-top:6px">
+      <label class="tag" style="font-size:11px;color:var(--dim);width:56px">俯仰</label>
+      <input type="range" id="pitch" class="grow" min="-10" max="10" value="0">
+      <output id="pitchOut" class="tag">0°</output>
+    </div>
+    <p class="note">侧移为「转向 → 直行 → 转回」的组合动作（约 6 秒），非真正的横走；
+      微调利用受控打滑，依赖脚垫摩擦。它们都是 2DOF 构型的软件补偿，代价是慢或有滑移。</p>
+  </div>
+
+  <div class="card">
+    <h2>标定（高级）</h2>
+    <div class="badges">
+      <span class="badge" id="calState">未标定</span>
+      <span class="badge">端点严禁贴死</span>
+      <span class="badge">中位距端点 ≥100µs</span>
+    </div>
+    <div class="grid g3">
+      <button class="btn" id="bCalEnter">进入标定</button>
+      <button class="btn" id="bCalExit">退出标定</button>
+      <button class="btn" id="bCalSave">保存到 NVS</button>
+    </div>
+    <div id="calList" style="margin-top:10px"></div>
+    <details style="margin-top:8px">
+      <summary>通道与几何参数（只读）</summary>
+      <table class="kv" id="paramTable"></table>
+    </details>
+    <p class="note">标定模式会令 8 路归中并禁止一切运动指令。
+      扫描（cal scan）耗时约 30 秒且需持续观察，故仅在串口提供。</p>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const LEGN = ["FL","FR","RL","RR"];
+const JOINT = ["髋","膝"];
+const LIM = {hip:60, betaMin:21.3, betaMax:65.4};
+
+let ws=null, wsOpen=false, seq=0, calibMode=false, calibReady=false;
+let params=null, calData=null;
+let driveTimer=null, vx=0, vy=0, yaw=0;
+let joyId=null;
+
+/* ---------------------------------------------------------------- toast */
+let toastT=null;
+function toast(msg,ms=1600){
+  const t=$("#toast"); t.textContent=msg; t.style.opacity=1;
+  clearTimeout(toastT); toastT=setTimeout(()=>t.style.opacity=0,ms);
+}
+
+/* ---------------------------------------------------------------- WS */
+function connect(){
+  ws = new WebSocket("ws://"+location.host+"/ws");
+
+  ws.onopen = ()=>{
+    wsOpen=true;
+    $("#dot").classList.add("on");
+    $("#conn").textContent="已连接";
+    send({t:"ping",id:++seq});
+  };
+  ws.onclose = ()=>{
+    wsOpen=false;
+    $("#dot").classList.remove("on");
+    $("#conn").textContent="已断开";
+    stopDrive();
+    $("#calwarn").style.display = calibReady ? "none" : "block";
+    setTimeout(connect,1500);
+  };
+  ws.onerror = ()=>{ try{ws.close()}catch(e){} };
+  ws.onmessage = ev=>{
+    let m; try{ m=JSON.parse(ev.data) }catch(e){ return }
+    if(m.t==="st") onStatus(m);
+    else if(m.t==="ack" && m.ok===false) toast("被拒绝："+(m.error||"?"));
+  };
+}
+
+function send(o){
+  if(!wsOpen||ws.readyState!==1) return false;
+  ws.send(JSON.stringify(o));
+  return true;
+}
+function cmd(o,quiet){
+  o.id=++seq;
+  if(!send(o)){ if(!quiet) toast("连接已断开"); return false }
+  return true;
+}
+
+/* ---------------------------------------------------------------- 状态 */
+function onStatus(m){
+  $("#rMode").textContent = m.mode;
+  $("#rGait").textContent = m.gait;
+  $("#rSpeed").textContent = m.speed.toFixed(0)+"%";
+  $("#rHeight").textContent = m.height.toFixed(0)+"mm";
+  $("#rYaw").textContent = m.heading.toFixed(0)+"°";
+  $("#rMargin").textContent = m.margin.toFixed(0)+"mm";
+
+  $("#calState").textContent = m.calibrated ? "8 路已标定" : "未标定（出厂默认）";
+  $("#calState").className = "badge "+(m.calibrated?"ok":"warn");
+  if(!m.calibrated) $("#calwarn").style.display="block";
+
+  calibMode = !!m.cal_mode;
+  $("#bCalEnter").classList.toggle("on", !calibMode);
+  $("#bCalExit").classList.toggle("on", calibMode);
+
+  const est=$("#estop");
+  est.classList.toggle("latched", !!m.estop);
+  est.textContent = m.estop ? "急停中 · 点击解除" : "急 停";
+
+  $("#bCrawl").classList.toggle("on", m.gait==="CRAWL");
+  $("#bTrot").classList.toggle("on", m.gait==="TROT");
+
+  drawLegs(m.legs);
+}
+
+function drawLegs(legs){
+  const box=$("#legs");
+  if(box.children.length!==4){
+    box.innerHTML=LEGN.map(n=>`<div class="leg"><b>${n}</b>
+      <svg width="52" height="44" viewBox="0 0 52 44">
+        <rect x="20" y="2" width="12" height="7" rx="1.5" fill="#3d4855"/>
+        <line class="t1" x1="26" y1="9" x2="26" y2="22" stroke="#6b7a8a" stroke-width="2.5" stroke-linecap="round"/>
+        <line class="t2" x1="26" y1="22" x2="26" y2="40" stroke="#58a6ff" stroke-width="2.5" stroke-linecap="round"/>
+        <circle class="k" cx="26" cy="22" r="3" fill="#8b98a5"/>
+      </svg><i class="v">—</i></div>`).join("");
+  }
+  legs.forEach((L,i)=>{
+    const el=box.children[i];
+    const [h,k]=L;
+    // 髋：绕机身的水平摆动，用上臂倾角示意
+    const t1=el.querySelector(".t1"), t2=el.querySelector(".t2");
+    t1.setAttribute("x2",(26+h*0.32).toFixed(1));
+    t1.setAttribute("y2",(22-Math.abs(h)*0.06).toFixed(1));
+    // 膝：腿的伸展程度（beta 越小越伸展）
+    const ex=Math.max(0,Math.min(1,(k-LIM.betaMin)/(LIM.betaMax-LIM.betaMin)));
+    t2.setAttribute("y2",(40-13*ex).toFixed(1));
+    t2.setAttribute("x2",(26).toFixed(1));
+    el.querySelector(".v").textContent=`${JOINT[0]} ${h.toFixed(0)}° / ${JOINT[1]} ${k.toFixed(1)}°`;
+    el.classList.toggle("swing", k < LIM.betaMin+2.5);
+  });
+}
+
+/* ---------------------------------------------------------------- 摇杆 */
+const stick=$("#stick"), knob=$("#knob");
+const R=60;   // 可拖动半径
+
+function joyAt(cx,cy){
+  const r=stick.getBoundingClientRect();
+  let dx=cx-(r.left+r.width/2), dy=cy-(r.top+r.height/2);
+  const d=Math.hypot(dx,dy);
+  if(d>R){ dx*=R/d; dy*=R/d }
+  knob.style.transform=`translate(${dx}px,${dy}px)`;
+  // 摇杆映射：纵向=前进，纵向右倾=转向。横移另有宏，不用摇杆（见 docs/protocol.md）
+  const nx=dx/R, ny=-dy/R;
+  const dead=0.16;
+  const dz=v=>Math.abs(v)<dead?0:(v-Math.sign(v)*dead)/(1-dead);
+  vx=Math.round(dz(ny)*100)/100;
+  yaw=Math.round(dz(nx)*100)/100;
+  vy=0;
+  startDrive();
+}
+function joyEnd(){
+  knob.style.transform="";
+  vx=yaw=vy=0;
+  // 摇杆松开：显式发零，而不是靠心跳超时——后者有 500ms 延迟
+  cmd({t:"drive",vx:0,vy:0,yaw:0},true);
+  stopDrive();
+}
+function startDrive(){
+  if(driveTimer) return;
+  driveTimer=setInterval(()=>{
+    cmd({t:"drive",vx,yaw,vy},true);
+  },50);   // 20Hz << 500ms 心跳阈值
+}
+function stopDrive(){
+  if(driveTimer){ clearInterval(driveTimer); driveTimer=null }
+}
+
+stick.addEventListener("pointerdown",e=>{
+  joyId=e.pointerId; stick.setPointerCapture(e.pointerId); joyAt(e.clientX,e.clientY);
+});
+stick.addEventListener("pointermove",e=>{ if(e.pointerId===joyId) joyAt(e.clientX,e.clientY) });
+stick.addEventListener("pointerup",e=>{ if(e.pointerId===joyId){ joyId=null; joyEnd() } });
+stick.addEventListener("pointercancel",()=>{ joyId=null; joyEnd() });
+
+/* 页面隐藏时主动停：手机息屏是常态，等 500ms 心跳会让机器人继续走一段 */
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden){
+    stopDrive();
+    cmd({t:"drive",vx:0,vy:0,yaw:0},true);
+    cmd({t:"stop"},true);
+    toast("已停止（页面切到后台）");
+  }
+});
+window.addEventListener("pagehide",()=>{ cmd({t:"stop"},true) });
+
+/* ---------------------------------------------------------------- 按钮 */
+$("#estop").addEventListener("click",()=>{
+  const latched=$("#estop").classList.contains("latched");
+  cmd({t: latched ? "estop_clear" : "estop"});
+  stopDrive(); vx=yaw=0; knob.style.transform="";
+});
+$("#bClearEstop").addEventListener("click",()=>cmd({t:"estop_clear"}));
+$("#bCrawl").addEventListener("click",()=>cmd({t:"gait",type:"crawl"}));
+$("#bTrot").addEventListener("click",()=>{
+  cmd({t:"gait",type:"trot"});
+  toast("小跑步态静态裕度为 0，靠动态平衡；速度已限 70%");
+});
+$("#bStop").addEventListener("click",()=>{ cmd({t:"stop"}); stopDrive();
+  vx=yaw=0; knob.style.transform=""; });
+$("#bStand").addEventListener("click",()=>cmd({t:"pose",name:"stand"}));
+$("#bRefresh").addEventListener("click",()=>fetch("/api/status").then(r=>r.json()).then(onStatus));
+document.querySelectorAll("[data-pose]").forEach(b=>
+  b.addEventListener("click",()=>cmd({t:"pose",name:b.dataset.pose})));
+document.querySelectorAll("[data-nudge]").forEach(b=>
+  b.addEventListener("click",()=>{
+    const [dx,dy]=b.dataset.nudge.split(",").map(Number);
+    if(dx===0&&dy===0){ cmd({t:"nudge",dx:0,dy:0}); return }
+    cmd({t:"nudge",dx,dy});
+  }));
+document.querySelectorAll("[data-strafe]").forEach(b=>
+  b.addEventListener("click",()=>{
+    const dx=Number(b.dataset.strafe); if(!dx) return;
+    cmd({t:"strafe_macro",dx});
+    toast("侧移中：转向 → 直行 → 转回");
+  }));
+
+$("#speed").addEventListener("input",e=>{
+  $("#speedOut").textContent=e.target.value+"%";
+  cmd({t:"speed",pct:Number(e.target.value)},true);
+});
+$("#height").addEventListener("input",e=>{
+  $("#heightOut").textContent=e.target.value+"mm";
+});
+$("#height").addEventListener("change",e=>{
+  cmd({t:"height",mm:Number(e.target.value)});
+  toast("变高：摆动相内逐腿执行，不拖脚");
+});
+let leanT=null;
+function onLean(){
+  const r=Number($("#roll").value), p=Number($("#pitch").value);
+  $("#rollOut").textContent=r+"°"; $("#pitchOut").textContent=p+"°";
+  clearTimeout(leanT);
+  leanT=setTimeout(()=>cmd({t:"lean",roll:r,pitch:p},true),120);
+}
+$("#roll").addEventListener("input",onLean);
+$("#pitch").addEventListener("input",onLean);
+
+/* ---------------------------------------------------------------- 标定 */
+$("#bCalEnter").addEventListener("click",()=>cmd({t:"cal_enter"}));
+$("#bCalExit").addEventListener("click",()=>cmd({t:"cal_exit"}));
+$("#bCalSave").addEventListener("click",()=>{
+  cmd({t:"cal_save"});
+  toast("已写入 NVS，重启后仍生效");
+});
+
+async function loadCal(){
+  try{
+    const j=await (await fetch("/api/cal")).json();
+    calData=j; calibReady=j.calibrated;
+    $("#calState").textContent=j.calibrated?"8 路已标定":"未标定（出厂默认）";
+    $("#calState").className="badge "+(j.calibrated?"ok":"warn");
+    $("#calwarn").style.display=j.calibrated?"none":"block";
+    $("#calList").innerHTML=j.ch.map(c=>`
+      <div class="calrow">
+        <div class="name">${LEGN[c.ch>>1]}.${JOINT[c.ch&1]}<br><span style="font-size:9px">ch${c.ch}</span></div>
+        <div class="sliders">
+          <div class="sline"><label>min</label>
+            <input type="range" min="800" max="1500" value="${c.min}" data-k="min" data-ch="${c.ch}">
+            <output>${c.min}µs</output></div>
+          <div class="sline"><label>max</label>
+            <input type="range" min="1500" max="2200" value="${c.max}" data-k="max" data-ch="${c.ch}">
+            <output>${c.max}µs</output></div>
+          <div class="sline"><label>neu</label>
+            <input type="range" min="1100" max="1900" value="${c.neutral}" data-k="neutral" data-ch="${c.ch}">
+            <output>${c.neutral}µs</output></div>
+          <div class="sline"><label>trim</label>
+            <input type="range" min="-200" max="200" value="${c.trim}" data-k="trim" data-ch="${c.ch}">
+            <output>${c.trim}µs</output></div>
+          <div class="sline"><label>反向</label>
+            <input type="checkbox" data-k="reverse" data-ch="${c.ch}" ${c.reverse?"checked":""}><output></output></div>
+        </div>
+      </div>`).join("");
+
+    $("#calList").addEventListener("input",e=>{
+      const t=e.target, ch=t.dataset.ch, k=t.dataset.k;
+      if(ch===undefined) return;
+      const c=calData.ch[+ch];
+      if(k==="reverse"){ c.reverse=t.checked; t.nextElementSibling.textContent=t.checked?"是":"否"; return }
+      c[k]=Number(t.value);
+      t.nextElementSibling.textContent=t.value+"µs";
+    });
+  }catch(e){ /* 设备离线时静默 */ }
+}
+
+async function saveCal(){
+  if(!calData) return;
+  const body={cal:calData.ch.map(c=>({
+    ch:c.ch,min:c.min,max:c.max,neutral:c.neutral,trim:c.trim,reverse:c.reverse}))};
+  try{
+    const r=await fetch("/api/cal",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(body)});
+    const j=await r.json();
+    if(j.ok){ toast("标定已保存（"+j.applied+" 路）"); loadCal(); }
+    else toast("保存被拒："+ (j.applied?("非法 "+j.rejected+" 路"):"写入失败"));
+  }catch(e){ toast("保存失败：网络错误") }
+}
+document.querySelector(".card:last-of-type").insertAdjacentHTML("beforeend",
+  `<div class="grid" style="grid-template-columns:1fr;margin-top:8px">
+     <button class="btn" id="bCalApply">保存这 8 路标定</button></div>`);
+$("#bCalApply").addEventListener("click",saveCal);
+
+/* ---------------------------------------------------------------- 参数 */
+async function loadParams(){
+  try{
+    params=await (await fetch("/api/params")).json();
+    const g=params.geom, c=params.crawl, t=params.trot;
+    $("#tGeom").textContent=`${g.L1.toFixed(0)}/${g.L2.toFixed(0)}mm, β=${g.beta_cruise_deg.toFixed(1)}°`;
+    $("#tSpeed").textContent=
+      `${(c.stride_mm/c.period_s).toFixed(0)} / ${(t.stride_mm/t.period_s).toFixed(0)} mm/s`;
+    $("#height").min=Math.ceil(params.limits.beta_min);
+    $("#height").max=Math.floor(params.limits.beta_max);
+    $("#paramTable").innerHTML=Object.entries({
+      "大腿 L1":g.L1.toFixed(1)+" mm",
+      "小腿 L2":g.L2.toFixed(1)+" mm",
+      "大腿倾角 α":g.alpha_deg.toFixed(1)+"°",
+      "巡航膝角 β":g.beta_cruise_deg.toFixed(2)+"°",
+      "髋软限位":"±"+params.limits.hip_deg.toFixed(0)+"°",
+      "膝软限位 β":[params.limits.beta_min,params.limits.beta_max].join(" ~ ")+"°",
+      "角速度上限":params.limits.max_rate_deg_s.toFixed(0)+"°/s",
+      "心跳超时":params.safety.heartbeat_ms+" ms",
+      "腿平面方位角":params.legs.map(l=>`${l.id} ${l.psi_deg.toFixed(0)}°`).join("，"),
+      "外八前/后":"36° / 48°（不对称，见 gait_design §3.5）",
+    }).map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+  }catch(e){}
+}
+
+/* ---------------------------------------------------------------- 启动 */
+fetch("/api/status").then(r=>r.json()).then(onStatus).catch(()=>{});
+loadCal(); loadParams(); connect();
+
+/* 遥测兜底：即使 WS 断，页面也定期拉一次状态 */
+setInterval(()=>{
+  if(!wsOpen) fetch("/api/status").then(r=>r.json()).then(onStatus).catch(()=>{});
+},1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+menu "机器蜘蛛配置"
+
+    config SPIDER_I2C_SDA_GPIO
+        int "PCA9685 SDA GPIO"
+        default 21
+        range 0 39
+        help
+            PCA9685 的 SDA 引脚。与 hardware.md 接线一致时保持 21。
+
+    config SPIDER_I2C_SCL_GPIO
+        int "PCA9685 SCL GPIO"
+        default 22
+        range 0 39
+        help
+            PCA9685 的 SCL 引脚。与 hardware.md 接线一致时保持 22。
+
+    config SPIDER_I2C_FREQ_HZ
+        int "I2C 频率 (Hz)"
+        default 400000
+        range 50000 1000000
+        help
+            PCA9685 支持 1MHz；400kHz 为稳妥值。
+
+    config SPIDER_PWM_FREQ_HZ
+        int "舵机 PWM 频率 (Hz)"
+        default 50
+        range 40 100
+        help
+            舵机标准 PWM 50Hz（周期 20ms）。不建议改动。
+
+    config SPIDER_MOTION_TICK_MS
+        int "motion 任务周期 (ms)"
+        default 2
+        range 1 10
+        help
+            运动控制任务周期（M2 启用）。2ms 对应 500Hz 更新率，
+            远高于 996R 的机械带宽，仅为保证插值平滑。
+
+    config SPIDER_DEBUG_CLI
+        bool "启用串口 CLI"
+        default y
+        help
+            M1 起提供串口调试命令（与 Web 同命令集）。关闭可减小体积。
+
+    config SPIDER_BENCH_MODE
+        bool "单腿台架模式（通电不驱动舵机）"
+        default n
+        help
+            台架模式：servo_tick() 不写任何 PWM，servo_set_mode() 进入标定
+            模式时也不再把 8 路拉到中位。
+
+            用途是单腿机械起止角标定。正常模式下 servo_tick() 是 PWM 的唯一
+            写入口，关掉它即可保证「上电即静默」——因为 servo_init() 会把膝
+            设成巡航 beta（出厂标定下约 1413µs），一旦启动就开始动，而那个位置
+            与实际机械零位无关。
+
+            台架下 PWM 完全由 CLI 的 leg 命令经 servo_pulse_raw() 驱动。
+
+            整机调试时必须关闭，否则机器人完全不会动。
+
+    config SPIDER_ESTOP_PIN
+        int "物理急停按钮 GPIO"
+        default -1
+        range -1 39
+        help
+            外接硬件急停按钮的 GPIO。-1 表示不启用。
+            软件急停（协议命令 + 心跳超时）始终有效，此项为额外保险。
+
+    config SPIDER_PCA9685_OE_GPIO
+        int "PCA9685 OE 引脚 GPIO"
+        default 25
+        range -1 39
+        help
+            PCA9685 的 OE（Output Enable，低有效）引脚所接的 ESP32 GPIO。
+            OE 拉高即硬件级关断全部 16 路输出，不依赖固件是否在运行，
+            因此 ESP32 复位、崩溃或卡在 bootloader 时舵机都会瘫软。
+
+            硬件要求：该 GPIO 必须外接 10kΩ 上拉至 3.3V，使上电复位期间
+            OE 默认为高（关断）。见 docs/hardware.md §5 接线表。
+
+            -1 表示不接 OE（输出永久使能，无硬件急停能力）。
+
+endmenu

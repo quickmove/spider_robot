@@ -1,0 +1,19 @@
+# ESP-IDF 分区表（4MB flash）
+#
+# 布局依据：M3 引入 WiFi+httpd 后固件约 850KB，原先 1MB app 分区只剩 19%。
+# 而分区表尾部原本空着 448KB、spiffs 分区完全没用到（控制页用
+# target_add_binary_data 内嵌），故重排：
+#   spiffs 取消（0x384KB 回收）
+#   factory 1.5MB：开发期 idf.py flash 走这里，留足余量
+#   app0/app1 各 1.125MB：OTA 双槽，保留回滚能力
+#
+# app 分区须 64KB 对齐。
+#
+# Name,     Type, SubType,  Offset,   Size,     Flags
+nvs,        data, nvs,      0x9000,   0x5000,
+otadata,    data, ota,      0xE000,   0x2000,
+phy_init,   data, phy,      0x10000,  0x1000,
+factory,    app,  factory,  0x20000,  0x180000,
+app0,       app,  ota_0,    0x1A0000, 0x120000,
+app1,       app,  ota_1,    0x2C0000, 0x120000,
+coredump,   data, coredump, 0x3E0000, 0x10000,
